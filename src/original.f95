@@ -108,8 +108,7 @@
             T11    = T11 + T(A1(i), A1(j), 0.0D0) * D1(i) * D1(j)
             T12    = T12 + T(A1(i), A2(j), R2) * D1(i) * D2(j)
             T22    = T22 + T(A2(i), A2(j), 0,0D0) * D2(i) * D2(j)
-          enddo ! do j
-        enddo   ! do i
+20      continue
       end subroutine Intgrl
           
 
