@@ -3,6 +3,7 @@ FLAGS   := -Wall -Waliasing -Wextra
 LDFLAGS :=
 
 build/original.out: build/original.o
+	mkdir -p build
 	$(FORTRAN) -o $@ $< $(FLAGS) $(LDFLAGS)
 
 build/original.o: src/original.f95
