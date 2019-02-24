@@ -217,6 +217,181 @@
         S = (PI + (A + B)) ** 1.5D0 * DEXP(- A * B * R_AB2 / (A + B))
         return
       end function S
+!***************************************************************
+      function T(A, B, R_AB2)
+!
+!     Calculates kinetic energy integrals for un-normalized primitives
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        data PI /3.1415926535898D0/
+        T = A * B / (A + B) * (3.0D0 - 2.0D0 * A * B * R_AB2 / (A + B)) * (PI / (A + B)) ** 1.5D0 &
+          * DEXP(-A * B * R_AB2 / (A + B))
+        return
+      end function T
+!***************************************************************
+      function V(A, B, R_AB2, R_CP2, ZC)
+!
+!     Calculates un-normalized nuclear attraction integrals
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        data PI/3.1415926535898D0/
+        V = 2.0D0 * PI / (A + B) * F0((A + B) * R_CP2) * DEXP(-A * B * R_AB2 / (A + B))
+        V = -V * ZC
+        return
+      end function V
+!***************************************************************
+      function TwoE(A, B, C, D, R_AB2, R_CD2, R_PQ2)
+! 
+!     Calculates two-electron integrals for un-normalized primitives
+!     A, B, C, D are the exponents alpha, beta, etc.
+!     R_AB2 equals squared distance between center A and center B
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        data PI /3.1415926535898D0/
+        TwoE = 2.0D0 * (PI ** 2.5D0) / ((A + B) * (C + D) * DSQRT(A + B + C + D)) &
+          * F0((A + B) * (C + D) * R_PQ2 / (A + B + C + D)) &
+          * DEXP(-A * B * R_AB2 / (A + B) - C * D * R_CD2 / (C + D) )
+        return
+      end function TwoE
+!***************************************************************
+      function Colect(IOP, N, R, ZETA1, ZETA2, ZA, ZB)
+!  
+!     This takes the basic integrals from common and assembles the
+!     relevant matrices, that is S, H, X, XT, and two-electron integrals
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        common /Matrix/ S(2, 2), X(2, 2), XT(2, 2), H(2, 2), F(2, 2), G(2, 2), C(2, 2), &
+          FPrime(2, 2), CPrime(2, 2), P(2, 2), OldP(2, 2), TT(2, 2, 2, 2), E(2, 2)
+        common/int/ S12, &              ! global variables?
+                    T11, T12, T22, &
+                    V11A, V12A, V22A, V11B, V12B, V22B, &
+                    V1111, V2111, V2121, V2211, V2221, V2222
+! From core hamiltonian
+        H(1, 1) = T11 + V11A + V11B
+        H(1, 2) = T12 + V12A + V12B
+        H(2, 1) = H(1, 2)             ! Hermitian operator
+        H(2, 2) = T22 + V22A + V22B
+! From overlap matrix
+        S(1, 1) = 1.0D0
+        S(1, 2) = S12
+        S(2, 1) = S(1, 2)
+        S(2, 2) = 1.0D0
+! Use canonical orthogonalization
+        X(1, 1) = 1.0D0 / DSQRT(2.0D0 * (1.0D0 + S12))
+        X(2, 1) = X(1, 1)
+        X(1, 2) = 1.0D0 / DSQRT(2.0D0 * (1.0D0 - S12))
+        X(2, 2) = X(1, 2)
+! Transpose of transformation matrix
+        XT(1, 1) = X(1, 1)
+        XT(1, 2) = X(2, 1)
+        XT(2, 1) = X(1, 2)
+        XT(2, 2) = X(2, 2)
+! Matrix of two-exlectron integrals
+        TT(1, 1, 1, 1) = V1111
+        TT(2, 1, 1, 1) = V2111
+        TT(1, 2, 1, 1) = V2111
+        TT(1, 1, 2, 1) = V2111
+        TT(1, 1, 1, 2) = V2111
+        TT(2, 1, 2, 1) = V2121
+        TT(1, 2, 2, 1) = V2121
+        TT(2, 1, 1, 2) = V2121
+        TT(1, 2, 1, 2) = V2121
+        TT(2, 2, 1, 1) = V2211
+        TT(1, 1, 2, 2) = V2211
+        TT(2, 2, 2, 1) = V2221
+        TT(2, 2, 1, 2) = V2221
+        TT(2, 1, 2, 2) = V2221
+        TT(1, 2, 2, 2) = V2221
+        TT(2, 2, 2, 2) = V2222
 
+        if (IOP == 0) goto 40
+        call MatOut(S, 2, 2, 2, 2, 4HS    )
+        call MatOut(X, 2, 2, 2, 2, 4HX    )
+        call MatOut(H, 2, 2, 2, 2, 4HH    )
+        print 10
+10      format(//)
+        do 30 i = 1, 2
+          do 30 j = 1, 2
+            do 30 k = 1, 2
+              do 30 l = 1, 2
+                print 20, i, j, k, l, TT(i, j, k, l)
+20      format(3X, 1H(,4I2,2H ), F10.6)
+30      continue
+40      return
+      end function Colect
+!***************************************************************
+      subroutine SCF(IOP, N, R, ZETA1, ZETA2, Za, Zb)
+!
+!     Performs the SCF iterations
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        common /Matrix/ S(2, 2), X(2, 2), XT(2, 2), H(2, 2), F(2, 2), G(2, 2), C(2, 2), &
+          FPrime(2, 2), CPrime(2, 2), P(2, 2), OldP(2, 2), TT(2, 2, 2, 2), E(2, 2)
+        data PI /3.1415926535898D0/
+! convergence criterion for density matrix
+        data crit /1.0D-4/
+! Maximum number of iterations
+        data MaxIt /25/
+! Iteration number
+        iter = 0
+! Use core-hamiltonian for initial guess at F. i.e. (P = 0)
+        do 10 i = 1, 2
+          do 10 j = 1, 2
+10          P(i, j) = 0.0D0
+        if (IOP < 2) goto 20
+        call MatOut(P, 2, 2, 2, 2, 4HP    )
+! start of iteration loop
+20      iter = iter + 1
+        if (IOP < 2) goto 40
+        print 30, iter
+30      format (/, 4x, 28HSTART OF ITERATION NUMBER = , I2)
+40      continue
+! From two-elextron part of fock matrix from P
+        call FormG
+        if (IOP < 2) goto 50
+        call MatOut(G, 2, 2, 2, 2, 4HG    )
+50      continue
+! Add core hamiltonian to get fock matrix
+        do 60 i = 1, 2
+          do 60 j = 1, 2
+            F(i, j) = H(i, j) + G(i, j)
+60      continue
+! Calculate electronic energy
+        en = 0.0D0
+        do 70 i = 1, 2
+          do 70 j = 1, 2
+            en = en + 0.5D0 * P(i, j) * (H(i, j) + F(i, j))
+70      continue
+        if (IOP < 2) goto 90
+        call MatOut(F, 2, 2, 2, 2, 4HF    )
+        print 80, en
+80      format (///, 4x, 20HELECTRONIC ENERGY = ,D20.12)
+90      continue
+! Transform fock matrix using G for temporary storage
+        call Mult(F, X, G, 2, 2)
+        call Mult(XT, G, FPrime, 2, 2)
+! Diagonalize transformed fock matrix
+        call Diag(FPrime, CPrime, E)
+! Transform eigenvectors to get matrix C
+        call mult(X, CPrime, C, 2, 2)
+! Form new density matrix
+        do 100 i = 1, 2
+          do 100 j = 1, 2
+! save present density matrix
+! before creating new one
+100     continue
+      end subroutine SCF
+
+
+!***************************************************************
+!***************************************************************
+!***************************************************************
+!***************************************************************
+!***************************************************************
 !***************************************************************
 !***************************************************************
