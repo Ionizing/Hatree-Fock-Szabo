@@ -14,6 +14,7 @@
         ZETA2 = 1.24D0      ! Slater function exponent
         Za = 2.0D0          ! Nuclear charges of He
         Zb = 1.0D0          ! Nuclear charges of H
+        call HFcalc(IOP, N, R, ZETA1, ZETA2, Za, Zb)
       end
 
 !***************************************************************
@@ -33,12 +34,12 @@
         implicit double precision(A-H, O-Z)
         if (IOP == 0) goto 20
           print 10, N, Za, Zb
-10        format(1H1, 2X, 4HSTO-, T1, 21HG FOR ATOMIC NUMBERS ,F5.2, 5H AND F5.2,//)
+10        format(1H1, 2X, 4HSTO-, I1, 21HG FOR ATOMIC NUMBERS ,F5.2, 5H AND F5.2,//)
 20        continue
 ! Calculate all the one and two-electron integrals
         call Intgrl(IOP, N, R, ZETA1, ZETA2, Za, Zb)
 ! Be inefficient and put all integrals in pretty arrays
-        call collect(IOP, N, R, ZETA1, ZETA2, Za, Zb)
+        call Colect(IOP, N, R, ZETA1, ZETA2, Za, Zb)
 ! Perform the SCF calculation
         call SCF(IOP, N, R, ZETA1, ZETA2, Za, Zb)
         return
@@ -257,7 +258,7 @@
         return
       end function TwoE
 !***************************************************************
-      function Colect(IOP, N, R, ZETA1, ZETA2, ZA, ZB)
+      subroutine Colect(IOP, N, R, ZETA1, ZETA2, ZA, ZB)
 !  
 !     This takes the basic integrals from common and assembles the
 !     relevant matrices, that is S, H, X, XT, and two-electron integrals
@@ -322,7 +323,7 @@
 20      format(3X, 1H(,4I2,2H ), F10.6)
 30      continue
 40      return
-      end function Colect
+      end subroutine Colect
 !***************************************************************
       subroutine SCF(IOP, N, R, ZETA1, ZETA2, Za, Zb)
 !
@@ -464,10 +465,78 @@
 10      continue
         return
       end subroutine FormG
+!***************************************************************
+      subroutine Diag(F, C, E)
+! Diagonalizes F to give eigenvectors in C and eigenvalues in E
+! Theta is the angle describing solution
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        dimension F(2, 2), C(2, 2), E(2, 2)
+        data PI/3.1415926535898D0/
+        if (DABS(F(1, 1) - F(2, 2)) > 1.0D-20) goto 10
+! Here is symmetry determined solution (Homonuclear diatomic)
+        Theta = PI / 4.0D0
+        goto 20
+10      continue
+! Solution for heteronuclear diatomic
+        Theta = 0.5D0 * DATAN(2.0D0 * F(1, 2) / (F(1, 1) - F(2, 2)))
+20      continue
+        C(1, 1) =  DCOS(Theta)
+        C(2, 1) =  DSIN(Theta)
+        C(1, 2) =  DSIN(Theta)
+        C(2, 2) = -DCOS(Theta)
+        E(1, 1) = F(1, 1) * DCOS(Theta) ** 2 + F(2, 2) * DSIN(Theta) ** 2 &
+          + F(1, 2) * DSIN(2.0D0 * Theta)
+        E(2, 2) = F(2, 2) * DCOS(Theta) ** 2 + F(1, 1) * DSIN(Theta) ** 2 &
+          - F(1, 2) * DSIN(2.0D0 * Theta)
+        E(2, 1) = 0.0D0
+        E(1, 2) = 0.0D0
+! Order eigenvalues and eigenvectors
+        if (E(2, 2) > E(1, 1)) goto 30
+        temp = E(2, 2)
+        E(2, 2) = E(1, 1)
+        E(1, 1) = temp
+        temp = C(1, 2)
+        C(1, 2) = C(1, 1)
+        C(1, 1) = temp
+        temp = C(2, 2)
+        C(2, 2) = C(2, 1)
+        C(2, 1) = temp
+30      return
+      end subroutine Diag
+!***************************************************************
+      subroutine mult(A, B, C, IM, M)
+!
+!     Multiplies two square matrices A and B to get C
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        dimension A(IM, IM), B(IM, IM), C(IM, IM)
+        do 10 i = 1, M
+          do 10 j = 1, M
+            C(i, j) = 0.0D0
+            do 10 K = 1, M
+10      C(i, j) = C(i, j) + A(i, k) * B(k, j)
+        return
+      end subroutine mult
 
-
 !***************************************************************
+      subroutine MatOut(A, IM, IN, M, N, LABEL)
+!
+!     Print Matrices of site M by N
+!
 !***************************************************************
-!***************************************************************
-!***************************************************************
-!***************************************************************
+        implicit double precision(A-H, O-Z)
+        dimension A(IM, IN)
+        ihigh  = 0
+10      low    = ihigh + 1
+        ihigh  = ihigh + 8
+        ihigh  = MIN0(ihigh, N)
+        print 20, LABEL, (i, i=low, ihigh)
+20      format(///, 3x, 5H THE , a4, 6H ARRAY, /, 15x, 5(10x, I3, 6X)//)
+        do 30 i = 1, M
+30      print 40, I, (A(i, j), j=low, ihigh)
+40      format (I10, 5x, 5(1x, d18.10))
+        if (N - ihigh) 50, 50, 10
+50      return
+      end subroutine MatOut
