@@ -107,7 +107,7 @@
             S12    = S12  + S(A1(i), A2(j), R2)    * D1(i) * D2(j)
             T11    = T11  + T(A1(i), A1(j), 0.0D0) * D1(i) * D1(j)
             T12    = T12  + T(A1(i), A2(j), R2)    * D1(i) * D2(j)
-            T22    = T22  + T(A2(i), A2(j), 0,0D0) * D2(i) * D2(j)
+            T22    = T22  + T(A2(i), A2(j), 0.0D0) * D2(i) * D2(j)
 
             V11A   = V11A + V(A1(i), A1(j), 0.0D0, 0.0D0, Za) * D1(i) * D1(j)
             V12A   = V12A + V(A1(i), A2(j), R2   , R_AP2, Za) * D1(i) * D2(j)
@@ -290,7 +290,7 @@
         XT(1, 2) = X(2, 1)
         XT(2, 1) = X(1, 2)
         XT(2, 2) = X(2, 2)
-! Matrix of two-exlectron integrals
+! Matrix of two-electron integrals
         TT(1, 1, 1, 1) = V1111
         TT(2, 1, 1, 1) = V2111
         TT(1, 2, 1, 1) = V2111
@@ -384,12 +384,88 @@
           do 100 j = 1, 2
 ! save present density matrix
 ! before creating new one
+            OldP(i, j) = P(i, j)
+            P(i, j) = 0.0D0
+            do 100 k = 1, 1
+              P(i, j) = P(i, j) + 2.0D0 * C(i,k) * C(j, k)  ! eval product ?
 100     continue
+        if (IOP < 2) goto 110
+        call MatOut(FPrime, 2, 2, 2, 2, 4HF'   )
+        call MatOut(CPrime, 2, 2, 2, 2, 4HC'   )
+        call MatOut(E, 2, 2, 2, 2, 4HE    )
+        call MatOut(C, 2, 2, 2, 2, 4HC    )
+        call MatOut(P, 2, 2, 2, 2, 4HP    )
+110     continue
+! Calculate delta
+        Delta = 0.0D0
+        do 120 i = 1, 2
+          do 120 j = 1, 2
+            Delta = Delta + (P(i, j) - OldP(i, j)) ** 2
+120     continue
+        Delta = DSQRT(Delta / 4.0D0)
+        if (IOP == 0) goto 140
+        print 130, Delta
+130     format(/, 4x, 39HDELTA(CONVERGENCE OF DENSITY MATRIX) = &
+          F10.6, /)
+140     continue
+! Check for convergence
+        if (Delta < crit) goto 160
+! Not yet converged
+! Test for maximum nunber of iterations
+! If maximum number not yet reached then
+! go back for another iteration
+        if (iter < MaxIt) goto 20
+! Something wrong here
+        print 150
+150     format (4x, 21HNO CONVERGENCE IN SCF)
+        stop
+160     continue
+! Calculation converged if it got here
+! Add nuclear repulsion to get total energy
+        ENT = en + Za * Zb / R
+        if (IOP == 1) goto 180
+        print 170, en, ENT
+170     format(//, 4x, 21HCALCULATION CONVERGED, //, &
+          4x, 20HELECTRONIC ENERGY = , D20.12, // &
+          4x, 20HTOTAL ENERGY =      , D20.12)
+180     continue
+        if (IOP /= 1) goto 190
+! Print out the final results if
+! have not done so already
+        call MatOut (G, 2, 2, 2, 2, 4HG    )
+        call MatOut (F, 2, 2, 2, 2, 4HF    )
+        call MatOut (E, 2, 2, 2, 2, 4HE    )
+        call MatOut (C, 2, 2, 2, 2, 4HC    )
+        call MatOut (P, 2, 2, 2, 2, 4HP    )
+190     continue
+! PS matrix has mulliken populations
+        call mult(P, S, OldP, 2, 2)
+        if (IOP == 0) goto 200
+        call MatOut(OldP, 2, 2, 2, 2, 4HPS    )
+200     continue
+        return
       end subroutine SCF
+!***************************************************************
+      subroutine FormG
+!
+!     Calculates the G matrix from the density matrix
+!     and two-electron integrals
+!
+!***************************************************************
+        implicit double precision(A-H, O-Z)
+        common /Matrix/ S(2, 2), X(2, 2), XT(2, 2), H(2, 2), F(2, 2), G(2, 2), C(2, 2), &
+          FPrime(2, 2), CPrime(2, 2), P(2, 2), OldP(2, 2), TT(2, 2, 2, 2), E(2, 2)
+        do 10 i = 1, 2
+          do 10 j = 1, 2
+            G(i, j) = 0.0D0
+            do 10 k = 1, 2
+              do 10 l = 1, 2
+                G(i, j) = G(i, j) + P(k, l) * (TT(i, j, k, l) - 0.5D0 * TT(i, l, k, j))
+10      continue
+        return
+      end subroutine FormG
 
 
-!***************************************************************
-!***************************************************************
 !***************************************************************
 !***************************************************************
 !***************************************************************
