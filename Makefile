@@ -11,3 +11,6 @@ build/original.out: build/original.o
 build/original.o: src/original.f95
 	mkdir -p build
 	$(FORTRAN) -c -o $@ $< $(FLAGS)
+
+clean:
+	@rm -rf build

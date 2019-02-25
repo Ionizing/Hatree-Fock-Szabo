@@ -72,9 +72,9 @@
 ! Include normalization in contraction coefficients (D)
         do 10 i = 1, N
           A1(i) = Expon(i, N) * (ZETA1 ** 2)
-          D1(i) = Coef(i, N) * ((2.0D0 * A1(i) / PI) ** 0.75D0 )
+          D1(i) = Coef (i, N) * ((2.0D0 * A1(i) / PI) ** 0.75D0 )
           A2(i) = Expon(i, N) * (ZETA2 ** 2)
-          D1(i) = Coef(i, N) * ((2.0D0 * A2(i) / PI) ** 0.75D0 )
+          D2(i) = Coef (i, N) * ((2.0D0 * A2(i) / PI) ** 0.75D0 )
 10      continue
 ! D and A are now the contraction coefficients and exponents
 ! in terms of unnormalized primitive gaussians
@@ -112,10 +112,10 @@
 
             V11A   = V11A + V(A1(i), A1(j), 0.0D0, 0.0D0, Za) * D1(i) * D1(j)
             V12A   = V12A + V(A1(i), A2(j), R2   , R_AP2, Za) * D1(i) * D2(j)
-            V22A   = V11A + V(A2(i), A2(j), 0.0D0, R2   , Za) * D2(i) * D2(j)
-            V11B   = V11A + V(A1(i), A1(j), 0.0D0, R2   , Zb) * D1(i) * D1(j)
-            V12B   = V11A + V(A1(i), A2(j), R2   , R_BP2, Zb) * D1(i) * D2(j)
-            V22B   = V11A + V(A2(i), A2(j), 0.0D0, 0.0D0, Zb) * D2(i) * D2(j)
+            V22A   = V22A + V(A2(i), A2(j), 0.0D0, R2   , Za) * D2(i) * D2(j)
+            V11B   = V11B + V(A1(i), A1(j), 0.0D0, R2   , Zb) * D1(i) * D1(j)
+            V12B   = V12B + V(A1(i), A2(j), R2   , R_BP2, Zb) * D1(i) * D2(j)
+            V22B   = V22B + V(A2(i), A2(j), 0.0D0, 0.0D0, Zb) * D2(i) * D2(j)
 20      continue
 ! Calculate two-electron integrals
         do 30 i = 1, N
@@ -134,17 +134,17 @@
                 R_BQ2 = R_BQ ** 2
                 R_PQ2 = R_PQ ** 2
 
-                V1111 = V1111 - TwoE(A1(i), A1(j), A1(k), A1(l), 0.0D0, 0.0D0, 0.0D0) &
+                V1111 = V1111 + TwoE(A1(i), A1(j), A1(k), A1(l), 0.0D0, 0.0D0, 0.0D0) &
                   * D1(i) * D1(j) * D1(k) * D1(l)
-                V2111 = V2111 - TwoE(A2(i), A1(j), A1(k), A1(l), R2   , 0.0D0, R_AP2) &
+                V2111 = V2111 + TwoE(A2(i), A1(j), A1(k), A1(l), R2   , 0.0D0, R_AP2) &
                   * D2(i) * D1(j) * D1(k) * D1(l)
-                V2121 = V2121 - TwoE(A2(i), A1(j), A2(k), A1(l), R2   , R2   , R_PQ2) &
+                V2121 = V2121 + TwoE(A2(i), A1(j), A2(k), A1(l), R2   , R2   , R_PQ2) &
                   * D2(i) * D1(j) * D2(k) * D1(l)
-                V2211 = V2211 - TwoE(A2(i), A2(j), A1(k), A1(l), 0.0D0, 0.0D0, R2   ) &
+                V2211 = V2211 + TwoE(A2(i), A2(j), A1(k), A1(l), 0.0D0, 0.0D0, R2   ) &
                   * D2(i) * D2(j) * D1(k) * D1(l)
-                V2221 = V2221 - TwoE(A2(i), A2(j), A2(k), A1(l), 0.0D0, R2   , R_BQ2) &
+                V2221 = V2221 + TwoE(A2(i), A2(j), A2(k), A1(l), 0.0D0, R2   , R_BQ2) &
                   * D2(i) * D2(j) * D2(k) * D1(l)
-                V2222 = V2222 - TwoE(A2(i), A2(j), A2(k), A2(l), 0.0D0, 0.0D0, 0.0D0) &
+                V2222 = V2222 + TwoE(A2(i), A2(j), A2(k), A2(l), 0.0D0, 0.0D0, 0.0D0) &
                   * D2(i) * D2(j) * D2(k) * D2(l)
 30      continue
         
@@ -215,7 +215,7 @@
 !***************************************************************
         implicit double precision(A-H, O-Z)
         data PI /3.1415926535898D0/
-        S = (PI + (A + B)) ** 1.5D0 * DEXP(- A * B * R_AB2 / (A + B))
+        S = (PI / (A + B)) ** 1.5D0 * DEXP(-A * B * R_AB2 / (A + B))
         return
       end function S
 !***************************************************************
@@ -285,7 +285,7 @@
         X(1, 1) = 1.0D0 / DSQRT(2.0D0 * (1.0D0 + S12))
         X(2, 1) = X(1, 1)
         X(1, 2) = 1.0D0 / DSQRT(2.0D0 * (1.0D0 - S12))
-        X(2, 2) = X(1, 2)
+        X(2, 2) = -X(1, 2)
 ! Transpose of transformation matrix
         XT(1, 1) = X(1, 1)
         XT(1, 2) = X(2, 1)
